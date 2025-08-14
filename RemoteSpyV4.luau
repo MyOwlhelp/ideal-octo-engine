@@ -1015,27 +1015,48 @@ function genScript(remote, args)
     local gen = ""
     if #args > 0 then
         xpcall(function()
-            gen = "local Arguments = " .. LazyFix.Convert(args, true) .. "\n"
+            gen = "local Arguments = "..LazyFix.Convert(args, true) .. "\n"
+        end,function(err)
+            gen = gen .. "-- An error has occured:\n--"..err.."\n-- TableToString failure! Reverting to legacy functionality (results may vary)\nlocal args = {"
+            xpcall(function()
+                for i, v in next, args do
+                    if type(i) ~= "Instance" and type(i) ~= "userdata" then
+                        gen = gen .. "\n    [object] = "
+                    elseif type(i) == "string" then
+                        gen = gen .. '\n    ["' .. i .. '"] = '
+                    elseif type(i) == "userdata" and typeof(i) ~= "Instance" then
+                        gen = gen .. "\n    [" .. string.format("nil --[[%s]]", typeof(v)) .. ")] = "
+                    elseif type(i) == "userdata" then
+                         gen = gen .. "\n    [game." .. i:GetFullName() .. ")] = "
+                    end
+                    if type(v) ~= "Instance" and type(v) ~= "userdata" then
+                        gen = gen .. "object"
+                    elseif type(v) == "string" then
+                        gen = gen .. '"' .. v .. '"'
+                    elseif type(v) == "userdata" and typeof(v) ~= "Instance" then
+                        gen = gen .. string.format("nil --[[%s]]", typeof(v))
+                    elseif type(v) == "userdata" then
+                        gen = gen .. "game." .. v:GetFullName()
+                    end
+                end
+                gen ..= "\n}\n\n"
+            end,function()
+                gen ..= "}\n-- Legacy tableToString failure! Unable to decompile."
+            end)
         end)
-
+        if not remote:IsDescendantOf(game) and not getnilrequired then
+            gen = "function getNil(name,class) for _,v in next, getnilinstances()do if v.ClassName==class and v.Name==name then return v;end end end\n\n" .. gen
+        end
         if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-            if #args > 0 then
-                gen = gen .. "pcall(function()\n\t" .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer(table.unpack(args));\nend);"
-            else
-                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":FireServer();\nend);"
-            end
+            gen = gen .. "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer(table.unpack(args))\nend)"
         elseif remote:IsA("RemoteFunction") then
-            if #args > 0 then
-                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer(table.unpack(args));\nend);"
-            else
-                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer();\nend);"
-            end
+            gen = gen .. "pcall(function\n    " ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer(table.unpack(args))\nend)"
         end
     else
         if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-            gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":FireServer();\nend);"
+            gen = "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer()\nend)"
         elseif remote:IsA("RemoteFunction") then
-            gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer();\nend);"
+            gen = "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer()\nend)"
         end
     end
     prevTables = {}
