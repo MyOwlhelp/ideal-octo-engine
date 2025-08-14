@@ -4,10 +4,10 @@ if getgenv().SimpleSpyExecuted and type(getgenv().SimpleSpyShutdown) == "functio
 end
 
 local realconfigs = {
-    logcheckcaller = false,
-    autoblock = false,
+    logcheckcaller = true,
+    autoblock = true,
     funcEnabled = true,
-    advancedinfo = false
+    advancedinfo = true
 }
 
 local configs = newproxy(true)
@@ -1015,7 +1015,7 @@ function genScript(remote, args)
     local gen = ""
     if #args > 0 then
         xpcall(function()
-            gen = "local Arguments = "..LazyFix.Convert(args, true) .. "\n"
+            gen = "local Arguments = "..LazyFix.Convert(args, true) .. "\n\n"
         end,function(err)
             gen = gen .. "-- An error has occured:\n--"..err.."\n-- TableToString failure! Reverting to legacy functionality (results may vary)\nlocal args = {"
             xpcall(function()
@@ -1048,15 +1048,15 @@ function genScript(remote, args)
             gen = "function getNil(name,class) for _,v in next, getnilinstances()do if v.ClassName==class and v.Name==name then return v;end end end\n\n" .. gen
         end
         if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-            gen = gen .. "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer(table.unpack(args))\nend)"
+            gen = gen .. "pcall(function()\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer(table.unpack(Arguments))\nend)"
         elseif remote:IsA("RemoteFunction") then
-            gen = gen .. "pcall(function\n    " ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer(table.unpack(args))\nend)"
+            gen = gen .. "pcall(function()\n    " ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer(table.unpack(Arguments))\nend)"
         end
     else
         if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-            gen = "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer()\nend)"
+            gen = "pcall(function()\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer()\nend)"
         elseif remote:IsA("RemoteFunction") then
-            gen = "pcall(function\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer()\nend)"
+            gen = "pcall(function()\n    " .. LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer()\nend)"
         end
     end
     prevTables = {}
