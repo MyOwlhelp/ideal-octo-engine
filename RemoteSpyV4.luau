@@ -41,18 +41,14 @@ local spawn = task.spawn
 local clear = table.clear
 local clone = table.clone
 
-local function blankfunction(...)
-    return ...
-end
-
 local get_thread_identity = (syn and syn.get_thread_identity) or getidentity or getthreadidentity
 local set_thread_identity = (syn and syn.set_thread_identity) or setidentity
 local islclosure = islclosure or is_l_closure
 local threadfuncs = (get_thread_identity and set_thread_identity and true) or false
 
-local getinfo = getinfo or blankfunction
-local getupvalues = getupvalues or debug.getupvalues or blankfunction
-local getconstants = getconstants or debug.getconstants or blankfunction
+local getinfo = getinfo or info
+local getupvalues = getupvalues or debug.getupvalues or function(...) return ... end
+local getconstants = getconstants or debug.getconstants or function(...) return ... end
 
 local getcustomasset = getsynasset or getcustomasset
 local getcallingscript = getcallingscript or blankfunction
@@ -2169,7 +2165,7 @@ newButton("Decompile",
                         local decompiledsource = decompile(Source)
                         local Sourcev2s = v2s(Source)
                         if (decompiledsource):find("script") and Sourcev2s then
-                            DecompiledScripts[Source] = ("local script = %s\n%s"):format(Sourcev2s,decompiledsource)
+                            DecompiledScripts[Source] = ("-- Script Path: %s\n\n%s"):format(Sourcev2s,decompiledsource)
                         end
                     end,function(err)
                         return codebox:setRaw(("--[[\nAn error has occured\n%s\n]]"):format(err))
