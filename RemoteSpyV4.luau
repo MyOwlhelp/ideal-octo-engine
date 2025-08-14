@@ -1015,18 +1015,8 @@ function genScript(remote, args)
     local gen = ""
     if #args > 0 then
         xpcall(function()
-            gen = "local Arguments = " .. string.gsub(LazyFix.Convert(args, true), "    ", "\t") .. "\n"
+            gen = "local Arguments = " .. LazyFix.Convert(args, true) .. "\n"
         end)
-
-        if needGetNil and not getnilrequired then
-            gen = "local function getNil(name, class)\n" ..
-                "\tfor _, v in ipairs(getnilinstances()) do\n" ..
-                "\t\tif v.ClassName == class and v.Name == name then\n" ..
-                "\t\t\treturn v;\n" ..
-                "\t\tend;\n" ..
-                "\tend;\n" ..
-                "end;\n\n" .. gen
-        end
 
         if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
             if #args > 0 then
