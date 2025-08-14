@@ -1011,96 +1011,44 @@ end
 
 --- Generates a script from the provided arguments (first has to be remote path)
 function genScript(remote, args)
+    prevTables = {}
     local gen = ""
-    local needGetNil = false
-
-    -- Helper function to safely convert values to string representation
-    local function valueToString(v)
-        local t = type(v)
-        if t == "string" then
-            return string.format("%q", v)  -- Properly escape strings
-        elseif t == "number" or t == "boolean" then
-            return tostring(v)
-        elseif t == "userdata" then
-            local ut = typeof(v)
-            if ut == "Instance" then
-                -- Safely handle instances (including nil ones)
-                local success, fullName = pcall(function()
-                    return v:GetFullName()
-                end)
-                if success then
-                    return "game." .. fullName
-                else
-                    needGetNil = true
-                    local success2, name, className = pcall(function()
-                        return v.Name, v.ClassName
-                    end)
-                    if success2 then
-                        return string.format('getNil(%q, %q)', name, className)
-                    else
-                        return 'nil --[[Unidentified Instance]]'
-                    end
-                end
-            else
-                return string.format("nil --[[%s]]", ut)
-            end
-        else
-            return string.format("nil --[[%s]]", t)
-        end
-    end
-
-    -- Check if we need getNil helper (before generating args)
-    if not remote:IsDescendantOf(game) and not getnilrequired then
-        needGetNil = true
-    end
-
-    -- Generate arguments table if needed
     if #args > 0 then
-        gen = gen .. "local Arguments = {\n"
-        for i = 1, #args do
-            local v = args[i]
-            gen = gen .. "\t" .. valueToString(v)
-            if i < #args then  -- Add comma except for last element
-                gen = gen .. ","
+        xpcall(function()
+            gen = "local Arguments = " .. string.gsub(LazyFix.Convert(args, true), "    ", "\t") .. "\n"
+        end)
+
+        if needGetNil and not getnilrequired then
+            gen = "local function getNil(name, class)\n" ..
+                "\tfor _, v in ipairs(getnilinstances()) do\n" ..
+                "\t\tif v.ClassName == class and v.Name == name then\n" ..
+                "\t\t\treturn v;\n" ..
+                "\t\tend;\n" ..
+                "\tend;\n" ..
+                "end;\n\n" .. gen
+        end
+
+        if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
+            if #args > 0 then
+                gen = gen .. "pcall(function()\n\t" .. LazyFix.ConvertKnown("Instance", remote) .. ":FireServer(table.unpack(args));\nend);"
+            else
+                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":FireServer();\nend);"
             end
-            gen = gen .. "\n"
+        elseif remote:IsA("RemoteFunction") then
+            if #args > 0 then
+                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer(table.unpack(args));\nend);"
+            else
+                gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer();\nend);"
+            end
         end
-        gen = gen .. "};\n\n"
-    end
-
-    -- Add getNil helper if needed
-    if needGetNil and not getnilrequired then
-        gen = "local function getNil(name, class)\n" ..
-              "\tfor _, v in ipairs(getnilinstances()) do\n" ..
-              "\t\tif v.ClassName == class and v.Name == name then\n" ..
-              "\t\t\treturn v;\n" ..
-              "\t\tend;\n" ..
-              "\tend;\n" ..
-              "end;\n\n" .. gen
-    end
-
-    -- Generate remote invocation
-    local remotePath
-    if pcall(function() return remote:GetFullName() end) then
-        remotePath = "game." .. remote:GetFullName()
     else
-        remotePath = string.format('getNil(%q, %q)', remote.Name, remote.ClassName)
-    end
-
-    if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-        if #args > 0 then
-            gen = gen .. "pcall(function()\n\t" .. remotePath .. ":FireServer(table.unpack(args));\nend);"
-        else
-            gen = gen .. "pcall(function()\n\t" ..  remotePath .. ":FireServer();\nend);"
-        end
-    elseif remote:IsA("RemoteFunction") then
-        if #args > 0 then
-            gen = gen .. "pcall(function()\n\t" ..  remotePath .. ":InvokeServer(table.unpack(args));\nend);"
-        else
-            gen = gen .. "pcall(function()\n\t" ..  remotePath .. ":InvokeServer();\nend);"
+        if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
+            gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":FireServer();\nend);"
+        elseif remote:IsA("RemoteFunction") then
+            gen = gen .. "pcall(function()\n\t" ..  LazyFix.ConvertKnown("Instance", remote) .. ":InvokeServer();\nend);"
         end
     end
-
+    prevTables = {}
     return gen
 end
 
